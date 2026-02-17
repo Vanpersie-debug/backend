@@ -14,12 +14,18 @@ const gymRoutes = require("./routes/gym");
 const app = express();
 
 // ================= MIDDLEWARE =================
-app.use(cors());
+// CORS: Only allow your deployed frontend
+const FRONTEND_URL = "https://lacaselo-frontend-1.onrender.com";
+app.use(cors({
+  origin: FRONTEND_URL,
+  credentials: true // optional if you use cookies/auth
+}));
+
 app.use(express.json());
 
 // ================= ROUTES =================
 app.use("/api/drinks", barRoutes);
-app.use("/api/kitchen", kitchenRoutes); // ✅ FIXED
+app.use("/api/kitchen", kitchenRoutes);
 app.use("/api/expenses", expensesRoutes);
 app.use("/api/employees", employeesRoutes);
 app.use("/api/billiard", billiardRoutes);
@@ -35,5 +41,5 @@ app.get("/", (req, res) => {
 // ================= START SERVER =================
 const PORT = process.env.PORT || 5000;
 app.listen(PORT, () => {
-  console.log(`🚀 Backend running on http://localhost:${PORT}`);
+  console.log(`🚀 Backend running on port ${PORT}`);
 });
