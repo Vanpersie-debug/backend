@@ -5,7 +5,7 @@ const cors = require("cors");
 const barRoutes = require("./routes/bar");
 const kitchenRoutes = require("./routes/kitchen");
 const expensesRoutes = require("./routes/expenses");
-const employeesRoutes = require("./routes/employees");
+const creditsRoutes = require("./routes/credit"); 
 const totalsRoutes = require("./routes/totals");
 const billiardRoutes = require("./routes/billiard");
 const guesthouseRoutes = require("./routes/guesthouse");
@@ -18,7 +18,7 @@ const app = express();
 const FRONTEND_URL = "https://lacaselo-frontend-1.onrender.com";
 app.use(cors({
   origin: FRONTEND_URL,
-  credentials: true // optional if you use cookies/auth
+  credentials: true 
 }));
 
 app.use(express.json());
@@ -27,7 +27,7 @@ app.use(express.json());
 app.use("/api/drinks", barRoutes);
 app.use("/api/kitchen", kitchenRoutes);
 app.use("/api/expenses", expensesRoutes);
-app.use("/api/employees", employeesRoutes);
+app.use("/api/credits", creditsRoutes); 
 app.use("/api/billiard", billiardRoutes);
 app.use("/api/guesthouse", guesthouseRoutes);
 app.use("/api/gym", gymRoutes);
