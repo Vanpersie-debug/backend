@@ -31,96 +31,94 @@ function processAndReturn(rows, res) {
 }
 
 // =====================================================
-// GET PRODUCTS BY DATE (SAFE ROLLOVER)
+// GET PRODUCTS BY DATE
 // =====================================================
-router.get("/", async (req, res) => {
+router.get("/", (req, res) => {
   const { date } = req.query;
 
   if (!date) {
     return res.status(400).json({ message: "Date is required" });
   }
 
-  try {
-    // 1️⃣ Check if date already exists
-    db.query(
-      "SELECT * FROM bar_products WHERE date = ? ORDER BY id DESC",
-      [date],
-      (err, rows) => {
-        if (err) return res.status(500).json(err);
+  // 1️⃣ Check if records already exist for this date
+  db.query(
+    "SELECT * FROM bar_products WHERE date = ? ORDER BY id DESC",
+    [date],
+    (err, rows) => {
+      if (err) return res.status(500).json(err);
 
-        if (rows.length > 0) {
-          return processAndReturn(rows, res);
-        }
-
-        // 2️⃣ If no records → check previous day
-        const previousDate = new Date(date);
-        previousDate.setDate(previousDate.getDate() - 1);
-        const prevFormatted =
-          previousDate.toISOString().split("T")[0];
-
-        db.query(
-          "SELECT * FROM bar_products WHERE date = ?",
-          [prevFormatted],
-          (err, prevRows) => {
-            if (err) return res.status(500).json(err);
-
-            if (prevRows.length === 0) {
-              return res.json({
-                products: [],
-                totalEarned: 0,
-              });
-            }
-
-            // 3️⃣ Prepare rollover values
-            const insertValues = prevRows.map((p) => {
-              const total_stock =
-                Number(p.opening_stock) + Number(p.entree);
-
-              const closing_stock = Math.max(
-                total_stock - Number(p.sold),
-                0
-              );
-
-              return [
-                p.name,
-                p.initial_price,
-                p.price,
-                closing_stock,
-                0,
-                0,
-                date,
-              ];
-            });
-
-            // 4️⃣ Use INSERT IGNORE to prevent duplicates
-            db.query(
-              `INSERT IGNORE INTO bar_products
-              (name, initial_price, price, opening_stock, entree, sold, date)
-              VALUES ?`,
-              [insertValues],
-              (err) => {
-                if (err) return res.status(500).json(err);
-
-                // 5️⃣ Fetch new day's data
-                db.query(
-                  "SELECT * FROM bar_products WHERE date = ? ORDER BY id DESC",
-                  [date],
-                  (err, newRows) => {
-                    if (err)
-                      return res.status(500).json(err);
-
-                    processAndReturn(newRows, res);
-                  }
-                );
-              }
-            );
-          }
-        );
+      // ============================
+      // IF DATA EXISTS → RETURN IT
+      // ============================
+      if (rows.length > 0) {
+        return processAndReturn(rows, res);
       }
-    );
-  } catch (error) {
-    res.status(500).json({ error: error.message });
-  }
+
+      // ============================
+      // IF NO DATA → COPY FROM PREVIOUS DAY
+      // ============================
+      const previousDate = new Date(date);
+      previousDate.setDate(previousDate.getDate() - 1);
+      const prevFormatted =
+        previousDate.toISOString().split("T")[0];
+
+      db.query(
+        "SELECT * FROM bar_products WHERE date = ?",
+        [prevFormatted],
+        (err, prevRows) => {
+          if (err) return res.status(500).json(err);
+
+          if (prevRows.length === 0) {
+            return res.json({
+              products: [],
+              totalEarned: 0,
+            });
+          }
+
+          // Prepare insert values
+          const insertValues = prevRows.map((p) => {
+            const total_stock =
+              Number(p.opening_stock) + Number(p.entree);
+            const closing_stock = Math.max(
+              total_stock - Number(p.sold),
+              0
+            );
+
+            return [
+              p.name,
+              p.initial_price,
+              p.price,
+              closing_stock, // NEW OPENING STOCK
+              0, // entree reset
+              0, // sold reset
+              date,
+            ];
+          });
+
+          // Insert new day's records
+          db.query(
+            `INSERT INTO bar_products
+            (name, initial_price, price, opening_stock, entree, sold, date)
+            VALUES ?`,
+            [insertValues],
+            (err) => {
+              if (err) return res.status(500).json(err);
+
+              // Fetch newly created records
+              db.query(
+                "SELECT * FROM bar_products WHERE date = ? ORDER BY id DESC",
+                [date],
+                (err, newRows) => {
+                  if (err) return res.status(500).json(err);
+                  processAndReturn(newRows, res);
+                }
+              );
+            }
+          );
+        }
+      );
+    }
+  );
 });
 
 // =====================================================
@@ -159,7 +157,7 @@ router.post("/", (req, res) => {
 });
 
 // =====================================================
-// UPDATE PRODUCT
+// UPDATE PRODUCT (Entree & Sold)
 // =====================================================
 router.put("/:id", (req, res) => {
   const { entree = 0, sold = 0, date } = req.body;
