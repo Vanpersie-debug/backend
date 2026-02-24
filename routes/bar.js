@@ -40,83 +40,13 @@ router.get("/", (req, res) => {
     return res.status(400).json({ message: "Date is required" });
   }
 
-  // 1️⃣ Check if records already exist for this date
   db.query(
     "SELECT * FROM bar_products WHERE date = ? ORDER BY id DESC",
     [date],
     (err, rows) => {
       if (err) return res.status(500).json(err);
 
-      // ============================
-      // IF DATA EXISTS → RETURN IT
-      // ============================
-      if (rows.length > 0) {
-        return processAndReturn(rows, res);
-      }
-
-      // ============================
-      // IF NO DATA → COPY FROM PREVIOUS DAY
-      // ============================
-      const previousDate = new Date(date);
-      previousDate.setDate(previousDate.getDate() - 1);
-      const prevFormatted =
-        previousDate.toISOString().split("T")[0];
-
-      db.query(
-        "SELECT * FROM bar_products WHERE date = ?",
-        [prevFormatted],
-        (err, prevRows) => {
-          if (err) return res.status(500).json(err);
-
-          if (prevRows.length === 0) {
-            return res.json({
-              products: [],
-              totalEarned: 0,
-            });
-          }
-
-          // Prepare insert values
-          const insertValues = prevRows.map((p) => {
-            const total_stock =
-              Number(p.opening_stock) + Number(p.entree);
-            const closing_stock = Math.max(
-              total_stock - Number(p.sold),
-              0
-            );
-
-            return [
-              p.name,
-              p.initial_price,
-              p.price,
-              closing_stock, // NEW OPENING STOCK
-              0, // entree reset
-              0, // sold reset
-              date,
-            ];
-          });
-
-          // Insert new day's records
-          db.query(
-            `INSERT INTO bar_products
-            (name, initial_price, price, opening_stock, entree, sold, date)
-            VALUES ?`,
-            [insertValues],
-            (err) => {
-              if (err) return res.status(500).json(err);
-
-              // Fetch newly created records
-              db.query(
-                "SELECT * FROM bar_products WHERE date = ? ORDER BY id DESC",
-                [date],
-                (err, newRows) => {
-                  if (err) return res.status(500).json(err);
-                  processAndReturn(newRows, res);
-                }
-              );
-            }
-          );
-        }
-      );
+      return processAndReturn(rows, res);
     }
   );
 });
@@ -157,9 +87,9 @@ router.post("/", (req, res) => {
 });
 
 // =====================================================
-// UPDATE PRODUCT (Entree & Sold)
+// UPDATE ENTREE & SOLD
 // =====================================================
-router.put("/:id", (req, res) => {
+router.put("/stock/:id", (req, res) => {
   const { entree = 0, sold = 0, date } = req.body;
 
   if (!date) {
@@ -173,29 +103,35 @@ router.put("/:id", (req, res) => {
     [entree, sold, req.params.id, date],
     (err) => {
       if (err) return res.status(500).json(err);
-
-      res.json({ message: "Updated successfully" });
+      res.json({ message: "Stock updated successfully" });
     }
   );
 });
 
 // =====================================================
-// DELETE PRODUCT
+// UPDATE COST & SELLING PRICE ONLY
 // =====================================================
-router.delete("/:id", (req, res) => {
-  const { date } = req.query;
+router.put("/price/:id", (req, res) => {
+  const { initial_price, price, date } = req.body;
 
   if (!date) {
     return res.status(400).json({ message: "Date required" });
   }
 
+  if (initial_price === undefined || price === undefined) {
+    return res
+      .status(400)
+      .json({ message: "Cost and selling price required" });
+  }
+
   db.query(
-    "DELETE FROM bar_products WHERE id = ? AND date = ?",
-    [req.params.id, date],
+    `UPDATE bar_products
+     SET initial_price = ?, price = ?
+     WHERE id = ? AND date = ?`,
+    [initial_price, price, req.params.id, date],
     (err) => {
       if (err) return res.status(500).json(err);
-
-      res.json({ message: "Deleted successfully" });
+      res.json({ message: "Price updated successfully" });
     }
   );
 });
