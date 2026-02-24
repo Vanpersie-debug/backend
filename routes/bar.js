@@ -7,11 +7,16 @@ const db = require("../db");
 // =====================================================
 function processAndReturn(rows, res) {
   const products = rows.map((p) => {
-    const total_stock = Number(p.opening_stock) + Number(p.entree);
-    const closing_stock = Math.max(total_stock - Number(p.sold), 0);
-    const total_sold = Number(p.sold) * Number(p.price);
-    const profit =
-      Number(p.sold) * (Number(p.price) - Number(p.initial_price));
+    const opening_stock = Number(p.opening_stock || 0);
+    const entree = Number(p.entree || 0);
+    const sold = Number(p.sold || 0);
+    const price = Number(p.price || 0);
+    const initial_price = Number(p.initial_price || 0);
+
+    const total_stock = opening_stock + entree;
+    const closing_stock = Math.max(total_stock - sold, 0);
+    const total_sold = sold * price;
+    const profit = sold * (price - initial_price);
 
     return {
       ...p,
@@ -45,8 +50,7 @@ router.get("/", (req, res) => {
     [date],
     (err, rows) => {
       if (err) return res.status(500).json(err);
-
-      return processAndReturn(rows, res);
+      processAndReturn(rows, res);
     }
   );
 });
@@ -55,17 +59,14 @@ router.get("/", (req, res) => {
 // ADD PRODUCT
 // =====================================================
 router.post("/", (req, res) => {
-  const { name, initial_price, price, opening_stock, date } =
-    req.body;
+  const { name, initial_price, price, opening_stock, date } = req.body;
 
   if (!name || !date) {
-    return res
-      .status(400)
-      .json({ message: "Name and date required" });
+    return res.status(400).json({ message: "Name and date required" });
   }
 
   db.query(
-    `INSERT INTO bar_products
+    `INSERT INTO bar_products 
      (name, initial_price, price, opening_stock, entree, sold, date)
      VALUES (?, ?, ?, ?, 0, 0, ?)`,
     [
@@ -87,10 +88,12 @@ router.post("/", (req, res) => {
 });
 
 // =====================================================
-// UPDATE ENTREE & SOLD
+// UPDATE STOCK (ENTREE & SOLD)
+// Route: PUT /api/drinks/stock/:id
 // =====================================================
 router.put("/stock/:id", (req, res) => {
   const { entree = 0, sold = 0, date } = req.body;
+  const { id } = req.params;
 
   if (!date) {
     return res.status(400).json({ message: "Date required" });
@@ -100,9 +103,10 @@ router.put("/stock/:id", (req, res) => {
     `UPDATE bar_products 
      SET entree = ?, sold = ?
      WHERE id = ? AND date = ?`,
-    [entree, sold, req.params.id, date],
+    [Number(entree), Number(sold), id, date],
     (err) => {
       if (err) return res.status(500).json(err);
+
       res.json({ message: "Stock updated successfully" });
     }
   );
@@ -110,9 +114,11 @@ router.put("/stock/:id", (req, res) => {
 
 // =====================================================
 // UPDATE COST & SELLING PRICE ONLY
+// Route: PUT /api/drinks/price/:id
 // =====================================================
 router.put("/price/:id", (req, res) => {
   const { initial_price, price, date } = req.body;
+  const { id } = req.params;
 
   if (!date) {
     return res.status(400).json({ message: "Date required" });
@@ -128,9 +134,10 @@ router.put("/price/:id", (req, res) => {
     `UPDATE bar_products
      SET initial_price = ?, price = ?
      WHERE id = ? AND date = ?`,
-    [initial_price, price, req.params.id, date],
+    [Number(initial_price), Number(price), id, date],
     (err) => {
       if (err) return res.status(500).json(err);
+
       res.json({ message: "Price updated successfully" });
     }
   );
