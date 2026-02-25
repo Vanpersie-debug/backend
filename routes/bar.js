@@ -37,6 +37,7 @@ function processAndReturn(rows, res) {
 
 // =====================================================
 // GET PRODUCTS BY DATE
+// (AUTO CREATE NEXT DAY FROM YESTERDAY CLOSING)
 // =====================================================
 router.get("/", (req, res) => {
   const { date } = req.query;
@@ -45,12 +46,72 @@ router.get("/", (req, res) => {
     return res.status(400).json({ message: "Date is required" });
   }
 
+  // 1️⃣ Check if selected date already has data
   db.query(
     "SELECT * FROM bar_products WHERE date = ? ORDER BY id DESC",
     [date],
     (err, rows) => {
       if (err) return res.status(500).json(err);
-      processAndReturn(rows, res);
+
+      if (rows.length > 0) {
+        return processAndReturn(rows, res);
+      }
+
+      // 2️⃣ If no data → get yesterday
+      const yesterday = new Date(date);
+      yesterday.setDate(yesterday.getDate() - 1);
+      const yDate = yesterday.toISOString().split("T")[0];
+
+      db.query(
+        "SELECT * FROM bar_products WHERE date = ?",
+        [yDate],
+        (err2, yesterdayRows) => {
+          if (err2) return res.status(500).json(err2);
+
+          if (yesterdayRows.length === 0) {
+            return res.json({ products: [], totalEarned: 0 });
+          }
+
+          // 3️⃣ Prepare new rows using yesterday closing stock
+          const insertValues = yesterdayRows.map((p) => {
+            const opening_stock =
+              Number(p.opening_stock || 0) +
+              Number(p.entree || 0) -
+              Number(p.sold || 0);
+
+            return [
+              p.name,
+              p.initial_price,
+              p.price,
+              opening_stock > 0 ? opening_stock : 0,
+              0,
+              0,
+              date,
+            ];
+          });
+
+          // 4️⃣ Insert new day data
+          db.query(
+            `INSERT INTO bar_products
+             (name, initial_price, price, opening_stock, entree, sold, date)
+             VALUES ?`,
+            [insertValues],
+            (err3) => {
+              if (err3) return res.status(500).json(err3);
+
+              // 5️⃣ Fetch new day data
+              db.query(
+                "SELECT * FROM bar_products WHERE date = ? ORDER BY id DESC",
+                [date],
+                (err4, newRows) => {
+                  if (err4) return res.status(500).json(err4);
+                  processAndReturn(newRows, res);
+                }
+              );
+            }
+          );
+        }
+      );
     }
   );
 });
@@ -88,8 +149,7 @@ router.post("/", (req, res) => {
 });
 
 // =====================================================
-// UPDATE STOCK (ENTREE + SOLD)
-// PUT /api/drinks/stock/:id
+// UPDATE STOCK
 // =====================================================
 router.put("/stock/:id", (req, res) => {
   const { entree, sold, date } = req.body;
@@ -118,7 +178,6 @@ router.put("/stock/:id", (req, res) => {
 
 // =====================================================
 // UPDATE PRICE
-// PUT /api/drinks/price/:id
 // =====================================================
 router.put("/price/:id", (req, res) => {
   const { initial_price, price, date } = req.body;
