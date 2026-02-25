@@ -3,7 +3,7 @@ const router = express.Router();
 const db = require("../db");
 
 // =====================================================
-// HELPER FUNCTION – Calculate and Return Data
+// HELPER FUNCTION – CALCULATE VALUES
 // =====================================================
 function processAndReturn(rows, res) {
   const products = rows.map((p) => {
@@ -66,7 +66,7 @@ router.post("/", (req, res) => {
   }
 
   db.query(
-    `INSERT INTO bar_products
+    `INSERT INTO bar_products 
      (name, initial_price, price, opening_stock, entree, sold, date)
      VALUES (?, ?, ?, ?, 0, 0, ?)`,
     [
@@ -88,8 +88,8 @@ router.post("/", (req, res) => {
 });
 
 // =====================================================
-// UPDATE STOCK (ENTREE & SOLD)
-// Route: PUT /api/drinks/stock/:id
+// UPDATE STOCK (ENTREE + SOLD)
+// PUT /api/drinks/stock/:id
 // =====================================================
 router.put("/stock/:id", (req, res) => {
   const { entree, sold, date } = req.body;
@@ -111,15 +111,14 @@ router.put("/stock/:id", (req, res) => {
     ],
     (err) => {
       if (err) return res.status(500).json(err);
-
       res.json({ message: "Stock updated successfully" });
     }
   );
 });
 
 // =====================================================
-// UPDATE COST & SELLING PRICE
-// Route: PUT /api/drinks/price/:id
+// UPDATE PRICE
+// PUT /api/drinks/price/:id
 // =====================================================
 router.put("/price/:id", (req, res) => {
   const { initial_price, price, date } = req.body;
@@ -141,7 +140,6 @@ router.put("/price/:id", (req, res) => {
     ],
     (err) => {
       if (err) return res.status(500).json(err);
-
       res.json({ message: "Price updated successfully" });
     }
   );
