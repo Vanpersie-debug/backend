@@ -66,14 +66,14 @@ router.post("/", (req, res) => {
   }
 
   db.query(
-    `INSERT INTO bar_products 
+    `INSERT INTO bar_products
      (name, initial_price, price, opening_stock, entree, sold, date)
      VALUES (?, ?, ?, ?, 0, 0, ?)`,
     [
       name,
-      initial_price || 0,
-      price || 0,
-      opening_stock || 0,
+      Number(initial_price) || 0,
+      Number(price) || 0,
+      Number(opening_stock) || 0,
       date,
     ],
     (err, result) => {
@@ -92,7 +92,7 @@ router.post("/", (req, res) => {
 // Route: PUT /api/drinks/stock/:id
 // =====================================================
 router.put("/stock/:id", (req, res) => {
-  const { entree = 0, sold = 0, date } = req.body;
+  const { entree, sold, date } = req.body;
   const { id } = req.params;
 
   if (!date) {
@@ -100,10 +100,15 @@ router.put("/stock/:id", (req, res) => {
   }
 
   db.query(
-    `UPDATE bar_products 
+    `UPDATE bar_products
      SET entree = ?, sold = ?
      WHERE id = ? AND date = ?`,
-    [Number(entree), Number(sold), id, date],
+    [
+      Number(entree) || 0,
+      Number(sold) || 0,
+      id,
+      date,
+    ],
     (err) => {
       if (err) return res.status(500).json(err);
 
@@ -113,7 +118,7 @@ router.put("/stock/:id", (req, res) => {
 });
 
 // =====================================================
-// UPDATE COST & SELLING PRICE ONLY
+// UPDATE COST & SELLING PRICE
 // Route: PUT /api/drinks/price/:id
 // =====================================================
 router.put("/price/:id", (req, res) => {
@@ -124,17 +129,16 @@ router.put("/price/:id", (req, res) => {
     return res.status(400).json({ message: "Date required" });
   }
 
-  if (initial_price === undefined || price === undefined) {
-    return res
-      .status(400)
-      .json({ message: "Cost and selling price required" });
-  }
-
   db.query(
     `UPDATE bar_products
      SET initial_price = ?, price = ?
      WHERE id = ? AND date = ?`,
-    [Number(initial_price), Number(price), id, date],
+    [
+      Number(initial_price) || 0,
+      Number(price) || 0,
+      id,
+      date,
+    ],
     (err) => {
       if (err) return res.status(500).json(err);
 
