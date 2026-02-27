@@ -7,11 +7,11 @@ const db = require("../db");
 // =====================================================
 function processAndReturn(rows, res) {
   const products = rows.map((p) => {
-    const opening_stock = Number(p.opening_stock || 0);
-    const entree = Number(p.entree || 0);
-    const sold = Number(p.sold || 0);
-    const price = Number(p.price || 0);
-    const initial_price = Number(p.initial_price || 0);
+    const opening_stock = Number(p.opening_stock) || 0;
+    const entree = Number(p.entree) || 0;
+    const sold = Number(p.sold) || 0;
+    const price = Number(p.price) || 0;
+    const initial_price = Number(p.initial_price) || 0;
 
     const total_stock = opening_stock + entree;
     const closing_stock = Math.max(total_stock - sold, 0);
@@ -37,7 +37,7 @@ function processAndReturn(rows, res) {
 
 // =====================================================
 // GET PRODUCTS BY DATE
-// (AUTO CREATE NEXT DAY FROM YESTERDAY CLOSING)
+// AUTO CREATE NEXT DAY FROM YESTERDAY CLOSING
 // =====================================================
 router.get("/", (req, res) => {
   const { date } = req.query;
@@ -46,7 +46,7 @@ router.get("/", (req, res) => {
     return res.status(400).json({ message: "Date is required" });
   }
 
-  // 1️⃣ Check if selected date already has data
+  // 1️⃣ Check if date already exists
   db.query(
     "SELECT * FROM bar_products WHERE date = ? ORDER BY id DESC",
     [date],
@@ -57,7 +57,7 @@ router.get("/", (req, res) => {
         return processAndReturn(rows, res);
       }
 
-      // 2️⃣ If no data → get yesterday
+      // 2️⃣ Get yesterday
       const yesterday = new Date(date);
       yesterday.setDate(yesterday.getDate() - 1);
       const yDate = yesterday.toISOString().split("T")[0];
@@ -72,25 +72,24 @@ router.get("/", (req, res) => {
             return res.json({ products: [], totalEarned: 0 });
           }
 
-          // 3️⃣ Prepare new rows using yesterday closing stock
+          // 3️⃣ Create new day from yesterday closing
           const insertValues = yesterdayRows.map((p) => {
-            const opening_stock =
-              Number(p.opening_stock || 0) +
-              Number(p.entree || 0) -
-              Number(p.sold || 0);
+            const closing_stock =
+              (Number(p.opening_stock) || 0) +
+              (Number(p.entree) || 0) -
+              (Number(p.sold) || 0);
 
             return [
               p.name,
-              p.initial_price,
-              p.price,
-              opening_stock > 0 ? opening_stock : 0,
+              Number(p.initial_price) || 0,
+              Number(p.price) || 0,
+              closing_stock > 0 ? closing_stock : 0,
               0,
               0,
               date,
             ];
           });
 
-          // 4️⃣ Insert new day data
           db.query(
             `INSERT INTO bar_products
              (name, initial_price, price, opening_stock, entree, sold, date)
@@ -99,7 +98,6 @@ router.get("/", (req, res) => {
             (err3) => {
               if (err3) return res.status(500).json(err3);
 
-              // 5️⃣ Fetch new day data
               db.query(
                 "SELECT * FROM bar_products WHERE date = ? ORDER BY id DESC",
                 [date],
@@ -127,7 +125,7 @@ router.post("/", (req, res) => {
   }
 
   db.query(
-    `INSERT INTO bar_products 
+    `INSERT INTO bar_products
      (name, initial_price, price, opening_stock, entree, sold, date)
      VALUES (?, ?, ?, ?, 0, 0, ?)`,
     [
@@ -149,7 +147,7 @@ router.post("/", (req, res) => {
 });
 
 // =====================================================
-// UPDATE STOCK
+// UPDATE STOCK (ENTREE + SOLD)
 // =====================================================
 router.put("/stock/:id", (req, res) => {
   const { entree, sold, date } = req.body;
@@ -177,7 +175,7 @@ router.put("/stock/:id", (req, res) => {
 });
 
 // =====================================================
-// UPDATE PRICE
+// UPDATE PRICE ONLY
 // =====================================================
 router.put("/price/:id", (req, res) => {
   const { initial_price, price, date } = req.body;
@@ -200,6 +198,35 @@ router.put("/price/:id", (req, res) => {
     (err) => {
       if (err) return res.status(500).json(err);
       res.json({ message: "Price updated successfully" });
+    }
+  );
+});
+
+// =====================================================
+// EDIT PRODUCT (NAME + COST + SELLING)
+// =====================================================
+router.put("/edit/:id", (req, res) => {
+  const { name, initial_price, price, date } = req.body;
+  const { id } = req.params;
+
+  if (!name || !date) {
+    return res.status(400).json({ message: "Name and date required" });
+  }
+
+  db.query(
+    `UPDATE bar_products
+     SET name = ?, initial_price = ?, price = ?
+     WHERE id = ? AND date = ?`,
+    [
+      name,
+      Number(initial_price) || 0,
+      Number(price) || 0,
+      id,
+      date,
+    ],
+    (err) => {
+      if (err) return res.status(500).json(err);
+      res.json({ message: "Product updated successfully" });
     }
   );
 });
