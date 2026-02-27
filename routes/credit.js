@@ -2,112 +2,79 @@ const express = require("express");
 const router = express.Router();
 const db = require("../db");
 
-// ================= GET ALL CREDITS =================
+// ================= GET ALL EMPLOYEES =================
 router.get("/", (req, res) => {
-  const sql = "SELECT * FROM credits ORDER BY id DESC";
+  const sql = `
+    SELECT e.*,
+      IFNULL(SUM(l.loan_amount),0) AS total_loan,
+      IFNULL(SUM(l.paid_amount),0) AS total_paid,
+      IFNULL(SUM(l.loan_amount - l.paid_amount),0) AS total_remaining
+    FROM employees e
+    LEFT JOIN employee_loans l ON e.id = l.employee_id
+    GROUP BY e.id
+    ORDER BY e.id DESC
+  `;
 
   db.query(sql, (err, rows) => {
-    if (err) {
-      console.error("FETCH ERROR:", err);
-      return res.status(500).json(err);
-    }
-
-    // Dashboard totals
-    const totalPayment = rows.reduce(
-      (sum, r) => sum + Number(r.payment || 0),
-      0
-    );
-
-    const totalCredit = rows.reduce(
-      (sum, r) => sum + Number(r.credit || 0),
-      0
-    );
-
-    const totalRemaining = rows.reduce(
-      (sum, r) => sum + Number(r.remaining || 0),
-      0
-    );
-
-    res.json({
-      records: rows,
-      totalPayment,
-      totalCredit,
-      totalRemaining,
-    });
+    if (err) return res.status(500).json(err);
+    res.json(rows);
   });
 });
 
-// ================= ADD NEW CREDIT =================
+// ================= ADD NEW EMPLOYEE =================
 router.post("/", (req, res) => {
-  const { name, payment, credit } = req.body;
+  const { name, monthly_salary } = req.body;
 
-  if (!name)
-    return res.status(400).json({ message: "Name is required" });
-
-  const sql = `
-    INSERT INTO credits (name, payment, credit)
-    VALUES (?, ?, ?)
-  `;
+  if (!name) return res.status(400).json({ message: "Name is required" });
 
   db.query(
-    sql,
-    [
-      name,
-      Number(payment || 0),
-      Number(credit || 0)
-    ],
+    "INSERT INTO employees (name, monthly_salary) VALUES (?, ?)",
+    [name, Number(monthly_salary || 0)],
     (err, result) => {
-      if (err) {
-        console.error("INSERT ERROR:", err);
-        return res.status(500).json(err);
-      }
-
-      db.query(
-        "SELECT * FROM credits WHERE id = ?",
-        [result.insertId],
-        (err2, rows) => {
-          if (err2) return res.status(500).json(err2);
-          res.json(rows[0]);
-        }
-      );
+      if (err) return res.status(500).json(err);
+      res.json({ id: result.insertId, name, monthly_salary });
     }
   );
 });
 
-// ================= UPDATE CREDIT =================
-router.put("/:id", (req, res) => {
-  const { name, payment, credit } = req.body;
-  const { id } = req.params;
+// ================= GET LOANS OF ONE EMPLOYEE =================
+router.get("/:id/loans", (req, res) => {
+  db.query(
+    "SELECT * FROM employee_loans WHERE employee_id=? ORDER BY id DESC",
+    [req.params.id],
+    (err, rows) => {
+      if (err) return res.status(500).json(err);
+      res.json(rows);
+    }
+  );
+});
 
-  const sql = `
-    UPDATE credits
-    SET name=?, payment=?, credit=?
-    WHERE id=?
-  `;
+// ================= ADD LOAN TO EMPLOYEE =================
+router.post("/:id/loans", (req, res) => {
+  const { loan_amount } = req.body;
 
   db.query(
-    sql,
-    [
-      name,
-      Number(payment || 0),
-      Number(credit || 0),
-      id
-    ],
+    "INSERT INTO employee_loans (employee_id, loan_amount) VALUES (?, ?)",
+    [req.params.id, Number(loan_amount || 0)],
     (err) => {
       if (err) return res.status(500).json(err);
-      res.json({ message: "Credit updated successfully" });
+      res.json({ message: "Loan added successfully" });
     }
   );
 });
 
-// ================= DELETE CREDIT =================
-router.delete("/:id", (req, res) => {
-  const { id } = req.params;
+// ================= UPDATE LOAN PAYMENT =================
+router.put("/loans/:loanId", (req, res) => {
+  const { paid_amount } = req.body;
 
-  db.query("DELETE FROM credits WHERE id=?", [id], (err) => {
-    if (err) return res.status(500).json(err);
-    res.json({ message: "Credit deleted successfully" });
-  });
+  db.query(
+    "UPDATE employee_loans SET paid_amount=? WHERE id=?",
+    [Number(paid_amount || 0), req.params.loanId],
+    (err) => {
+      if (err) return res.status(500).json(err);
+      res.json({ message: "Payment updated successfully" });
+    }
+  );
 });
 
 module.exports = router;
