@@ -203,10 +203,10 @@ router.put("/price/:id", (req, res) => {
 });
 
 // =====================================================
-// EDIT PRODUCT (NAME + COST + SELLING)
+// EDIT PRODUCT (NAME + COST + SELLING + OPENING STOCK)
 // =====================================================
 router.put("/edit/:id", (req, res) => {
-  const { name, initial_price, price, date } = req.body;
+  const { name, initial_price, price, opening_stock, date } = req.body;
   const { id } = req.params;
 
   if (!name || !date) {
@@ -215,17 +215,22 @@ router.put("/edit/:id", (req, res) => {
 
   db.query(
     `UPDATE bar_products
-     SET name = ?, initial_price = ?, price = ?
+     SET name = ?, 
+         initial_price = ?, 
+         price = ?, 
+         opening_stock = ?
      WHERE id = ? AND date = ?`,
     [
       name,
       Number(initial_price) || 0,
       Number(price) || 0,
+      Number(opening_stock) || 0,
       id,
       date,
     ],
     (err) => {
       if (err) return res.status(500).json(err);
+
       res.json({ message: "Product updated successfully" });
     }
   );
