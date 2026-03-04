@@ -1,6 +1,6 @@
 const express = require("express");
 const router = express.Router();
-const db = require("../db"); // your MySQL connection
+const db = require("../db"); // MySQL connection
 
 // ===== GET ALL EMPLOYEES =====
 router.get("/", (req, res) => {
@@ -18,7 +18,7 @@ router.get("/", (req, res) => {
 router.post("/", (req, res) => {
   const { name, payment } = req.body;
 
-  // ===== Validate input =====
+  // Validate input
   if (!name || !name.trim()) {
     return res.status(400).json({ error: "Name is required" });
   }
