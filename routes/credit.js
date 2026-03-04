@@ -2,7 +2,7 @@ const express = require("express");
 const router = express.Router();
 const db = require("../db"); // your MySQL connection
 
-// ================= GET ALL EMPLOYEES =================
+// ===== GET ALL EMPLOYEES =====
 router.get("/", (req, res) => {
   const sql = "SELECT * FROM employees ORDER BY id DESC";
   db.query(sql, (err, rows) => {
@@ -14,15 +14,18 @@ router.get("/", (req, res) => {
   });
 });
 
-// ================= ADD NEW EMPLOYEE =================
+// ===== ADD NEW EMPLOYEE =====
 router.post("/", (req, res) => {
   const { name, payment } = req.body;
 
-  // Validate input
-  if (!name || !name.trim()) return res.status(400).json({ error: "Name is required" });
-  if (isNaN(payment)) return res.status(400).json({ error: "Payment must be a number" });
+  // ===== Validate input =====
+  if (!name || !name.trim()) {
+    return res.status(400).json({ error: "Name is required" });
+  }
+  if (payment === undefined || isNaN(Number(payment))) {
+    return res.status(400).json({ error: "Payment must be a valid number" });
+  }
 
-  // Insert into employees table
   const sql = "INSERT INTO employees (name, payment) VALUES (?, ?)";
   db.query(sql, [name.trim(), Number(payment)], (err, result) => {
     if (err) {
@@ -41,30 +44,36 @@ router.post("/", (req, res) => {
   });
 });
 
-// ================= GET EMPLOYEE LOANS =================
+// ===== GET EMPLOYEE LOANS =====
 router.get("/:id/loans", (req, res) => {
   const { id } = req.params;
-  const sql = "SELECT * FROM employee_loans WHERE employee_id=? ORDER BY loan_date DESC";
-  db.query(sql, [id], (err, rows) => {
-    if (err) {
-      console.error("GET LOANS ERROR:", err);
-      return res.status(500).json({ error: "Failed to fetch loans" });
+  db.query(
+    "SELECT * FROM employee_loans WHERE employee_id=? ORDER BY loan_date DESC",
+    [id],
+    (err, rows) => {
+      if (err) {
+        console.error("GET LOANS ERROR:", err);
+        return res.status(500).json({ error: "Failed to fetch loans" });
+      }
+      res.json(rows);
     }
-    res.json(rows);
-  });
+  );
 });
 
-// ================= ADD NEW LOAN =================
+// ===== ADD NEW LOAN =====
 router.post("/:id/loans", (req, res) => {
   const { id } = req.params;
   const { amount, reason, loan_date } = req.body;
 
-  if (!loan_date || isNaN(Number(amount))) return res.status(400).json({ error: "Invalid loan data" });
+  if (!loan_date || isNaN(Number(amount))) {
+    return res.status(400).json({ error: "Invalid loan data" });
+  }
 
   const insertSql = `
     INSERT INTO employee_loans (employee_id, amount, reason, loan_date, total_paid, remaining)
     VALUES (?, ?, ?, ?, 0, ?)
   `;
+
   db.query(insertSql, [id, Number(amount), reason || "", loan_date, Number(amount)], (err, result) => {
     if (err) {
       console.error("INSERT LOAN ERROR:", err);
