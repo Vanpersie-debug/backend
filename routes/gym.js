@@ -2,12 +2,21 @@ const express = require("express");
 const router = express.Router();
 const db = require("../db");
 
-// ================= GET ALL GYM RECORDS =================
+// ================= GET ALL GYM RECORDS (FILTER BY DATE) =================
 router.get("/", (req, res) => {
-  const sql = "SELECT * FROM gym ORDER BY date DESC";
-  db.query(sql, (err, rows) => {
-    if (err) return res.status(500).json(err);
+  const { date } = req.query;
+  let sql = "SELECT * FROM gym";
+  const params = [];
 
+  if (date) {
+    sql += " WHERE date = ?";
+    params.push(date);
+  }
+
+  sql += " ORDER BY date DESC";
+
+  db.query(sql, params, (err, rows) => {
+    if (err) return res.status(500).json(err);
     res.json({ records: rows });
   });
 });
