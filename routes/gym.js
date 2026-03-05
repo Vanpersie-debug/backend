@@ -8,75 +8,53 @@ router.get("/", (req, res) => {
   db.query(sql, (err, rows) => {
     if (err) return res.status(500).json(err);
 
-    // Calculate totals for frontend cards
-    const totalCash = rows.reduce((sum, r) => sum + Number(r.cash || 0), 0);
-    const totalMomo = rows.reduce((sum, r) => sum + Number(r.cash_momo || 0), 0);
-    const totalPeople = rows.reduce((sum, r) => sum + Number(r.total_people || 0), 0);
-
-    res.json({
-      records: rows,
-      totalCash,
-      totalMomo,
-      totalPeople,
-    });
+    res.json({ records: rows });
   });
 });
 
 // ================= ADD GYM RECORD =================
 router.post("/", (req, res) => {
-  const { date, daily_people, monthly_people, total_people, cash, cash_momo } = req.body;
+  let { date, daily_people, monthly_people, cash, cash_momo } = req.body;
 
-  if (!date)
-    return res.status(400).json({ message: "Date is required" });
+  if (!date) return res.status(400).json({ message: "Date is required" });
+
+  daily_people = Number(daily_people || 0);
+  monthly_people = Number(monthly_people || 0);
+  cash = Number(cash || 0);
+  cash_momo = Number(cash_momo || 0);
+  const total_people = daily_people + monthly_people;
 
   const sql = `
     INSERT INTO gym
     (date, daily_people, monthly_people, total_people, cash, cash_momo)
     VALUES (?, ?, ?, ?, ?, ?)
   `;
-
-  db.query(
-    sql,
-    [
-      date,
-      Number(daily_people || 0),
-      Number(monthly_people || 0),
-      Number(total_people || 0),
-      Number(cash || 0),
-      Number(cash_momo || 0),
-    ],
-    (err, result) => {
-      if (err) return res.status(500).json(err);
-      res.json({ message: "Gym record added", id: result.insertId });
-    }
-  );
+  db.query(sql, [date, daily_people, monthly_people, total_people, cash, cash_momo], (err, result) => {
+    if (err) return res.status(500).json(err);
+    res.json({ message: "Gym record added", id: result.insertId });
+  });
 });
 
 // ================= UPDATE GYM RECORD =================
 router.put("/:id", (req, res) => {
-  const { daily_people, monthly_people, total_people, cash, cash_momo } = req.body;
   const { id } = req.params;
+  let { daily_people, monthly_people, cash, cash_momo } = req.body;
+
+  daily_people = Number(daily_people || 0);
+  monthly_people = Number(monthly_people || 0);
+  cash = Number(cash || 0);
+  cash_momo = Number(cash_momo || 0);
+  const total_people = daily_people + monthly_people;
 
   const sql = `
     UPDATE gym
     SET daily_people=?, monthly_people=?, total_people=?, cash=?, cash_momo=?
     WHERE id=?
   `;
-  db.query(
-    sql,
-    [
-      Number(daily_people || 0),
-      Number(monthly_people || 0),
-      Number(total_people || 0),
-      Number(cash || 0),
-      Number(cash_momo || 0),
-      id,
-    ],
-    (err) => {
-      if (err) return res.status(500).json(err);
-      res.json({ message: "Gym record updated successfully" });
-    }
-  );
+  db.query(sql, [daily_people, monthly_people, total_people, cash, cash_momo, id], (err) => {
+    if (err) return res.status(500).json(err);
+    res.json({ message: "Gym record updated successfully" });
+  });
 });
 
 // ================= DELETE GYM RECORD =================
