@@ -27,7 +27,7 @@ router.post("/", (req, res) => {
   const { date, vip, normal, vip_price, normal_price } = req.body;
 
   if (!date) {
-    return res.status(400).json({ message: "Date is required" });
+    return res.status(400).json({ message: "Ntamakuru ahari y' izi tariki" });
   }
 
   const sql = `
