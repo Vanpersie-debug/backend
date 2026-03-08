@@ -1,5 +1,4 @@
 const db = require("../db");
-const bcrypt = require("bcryptjs");
 
 /*
 ================================
@@ -31,12 +30,10 @@ exports.createUser = async (req, res) => {
       });
     }
 
-    const hashedPassword = await bcrypt.hash(password, 10);
-
     const [result] = await db.query(
       `INSERT INTO users (username,password,role,status,branch_id)
        VALUES (?,?,?,?,?)`,
-      [username, hashedPassword, role, "active", branch_id || null]
+      [username, password, role, "active", branch_id || null]
     );
 
     res.status(201).json({
