@@ -10,6 +10,7 @@ const totalsRoutes = require("./routes/totals");
 const billiardRoutes = require("./routes/billiard");
 const guesthouseRoutes = require("./routes/guesthouse");
 const gymRoutes = require("./routes/gym");
+const authRoutes = require("./routes/auth");
 
 const app = express();
 
@@ -32,6 +33,7 @@ app.use("/api/billiard", billiardRoutes);
 app.use("/api/guesthouse", guesthouseRoutes);
 app.use("/api/gym", gymRoutes);
 app.use("/api", totalsRoutes);
+app.use("/api", authRoutes);
 
 // ================= DEFAULT ROUTE =================
 app.get("/", (req, res) => {

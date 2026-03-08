@@ -18,10 +18,13 @@
   "author": "Kayitare",
   "license": "ISC",
   "dependencies": {
-    "cors": "^2.8.5",
+    "bcryptjs": "^3.0.3",
+    "cors": "^2.8.6",
     "dotenv": "^16.6.1",
-    "express": "^4.18.2",
-    "mysql2": "^3.9.0"
+    "express": "^4.22.1",
+    "jsonwebtoken": "^9.0.3",
+    "jwt-decode": "^4.0.0",
+    "mysql2": "^3.19.0"
   },
   "devDependencies": {
     "nodemon": "^3.0.3"
