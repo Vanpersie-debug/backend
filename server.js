@@ -16,10 +16,21 @@ const logRoutes = require("./routes/log");
 const app = express();
 
 // ================= MIDDLEWARE =================
-// CORS: Only allow your deployed frontend
-const FRONTEND_URL = "https://lacaselo-frontend-1.onrender.com";
+// CORS: Allow deployed frontend + localhost for development
+const FRONTEND_URLS = [
+  "https://lacaselo-frontend-1.onrender.com",
+  "http://localhost:3000",
+  "http://localhost:5000"
+];
+
 app.use(cors({
-  origin: FRONTEND_URL,
+  origin: (origin, callback) => {
+    if (!origin || FRONTEND_URLS.includes(origin)) {
+      callback(null, true);
+    } else {
+      callback(new Error("Not allowed by CORS"));
+    }
+  },
   credentials: true 
 }));
 
