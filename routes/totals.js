@@ -4,7 +4,7 @@ const router = express.Router();
 const db = require("../db"); // your database connection
 
 // GET /api/total-money
-router.get("/total-money", (req, res) => {
+router.get("/", (req, res) => {
   const today = new Date().toISOString().split("T")[0]; // YYYY-MM-DD
 
   try {

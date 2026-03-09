@@ -13,7 +13,7 @@ router.post("/login", async (req, res) => {
       });
     }
 
-    const [rows] = await db.query(
+    const [rows] = await db.promise().query(
       "SELECT * FROM users WHERE username = ? AND status='active'",
       [username]
     );

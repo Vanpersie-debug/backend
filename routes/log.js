@@ -10,7 +10,7 @@ router.get(
   verifyToken,
   allowRoles("SUPER_ADMIN","ADMIN"),
   async (req, res) => {
-    const [logs] = await db.query(
+    const [logs] = await db.promise().query(
       `SELECT * FROM activity_logs
        ORDER BY created_at DESC
        LIMIT 200`

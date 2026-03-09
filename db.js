@@ -1,5 +1,5 @@
 const fs = require("fs");
-const mysql = require("mysql2/promise");
+const mysql = require("mysql2");
 require("dotenv").config();
 
 const db = mysql.createPool({
@@ -16,14 +16,14 @@ const db = mysql.createPool({
 });
 
 // Test connection
-db.getConnection()
-  .then((connection) => {
+db.getConnection((err, connection) => {
+  if (err) {
+    console.error("❌ MySQL Error:", err.message);
+  } else {
     console.log("✅ MySQL Connected to Aiven Cloud!");
     connection.release();
-  })
-  .catch((err) => {
-    console.error("❌ MySQL Error:", err.message);
-  });
+  }
+});
 
 module.exports = db;
 

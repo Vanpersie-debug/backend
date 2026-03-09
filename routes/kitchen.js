@@ -162,7 +162,51 @@ router.put("/sold/:id", (req, res) => {
       return res.status(500).json(err);
     }
 
-    res.json({ message: "Sold updated successfully" });
+  });
+});
+
+// =====================================================
+// EDIT PRODUCT (NAME + COST + SELLING + OPENING STOCK)
+// =====================================================
+router.put("/edit/:id", (req, res) => {
+  const { name, initial_price, price, opening_stock, date } = req.body;
+  const { id } = req.params;
+
+  if (!name || !date) {
+    return res.status(400).json({ message: "Name and date required" });
+  }
+
+  db.query(
+    `UPDATE kitchen_products
+     SET name = ?, 
+         initial_price = ?, 
+         price = ?, 
+         opening_stock = ?
+     WHERE id = ? AND date = ?`,
+    [
+      name,
+      Number(initial_price) || 0,
+      Number(price) || 0,
+      Number(opening_stock) || 0,
+      id,
+      date,
+    ],
+    (err) => {
+      if (err) return res.status(500).json(err);
+
+      res.json({ message: "Product updated successfully" });
+    }
+  );
+});
+
+// =====================================================
+// DELETE PRODUCT
+// =====================================================
+router.delete("/:id", (req, res) => {
+  const { id } = req.params;
+  db.query("DELETE FROM kitchen_products WHERE id = ?", [id], (err) => {
+    if (err) return res.status(500).json(err);
+    res.json({ message: "Product deleted successfully" });
   });
 });
 

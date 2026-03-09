@@ -2,9 +2,21 @@ const express = require("express");
 const router = express.Router();
 const db = require("../db"); // your MySQL connection
 
-// ===== GET ALL EMPLOYEES =====
+// ===== GET ALL EMPLOYEES W/ LOANS =====
 router.get("/", (req, res) => {
-  const sql = "SELECT * FROM credits ORDER BY id DESC";
+  const sql = `
+    SELECT 
+      c.id, 
+      c.name, 
+      c.payment, 
+      c.created_at,
+      IFNULL(SUM(l.amount), 0) AS total_loan,
+      IFNULL(SUM(l.remaining), 0) AS total_remaining
+    FROM credits c
+    LEFT JOIN employee_loans l ON c.id = l.employee_id
+    GROUP BY c.id
+    ORDER BY c.id DESC
+  `;
   db.query(sql, (err, rows) => {
     if (err) return res.status(500).json({ error: "Failed to fetch employees" });
     res.json(rows);
@@ -30,6 +42,98 @@ router.post("/", (req, res) => {
       if (err2) return res.status(500).json({ error: "Failed to fetch new employee" });
       res.json(rows[0]);
     });
+  });
+});
+
+// ===== DELETE EXISTING EMPLOYEE =====
+router.delete("/:id", (req, res) => {
+  const { id } = req.params;
+  db.query("DELETE FROM credits WHERE id=?", [id], (err) => {
+    if (err) return res.status(500).json({ error: "Failed to delete employee" });
+    res.json({ message: "Employee deleted successfully" });
+  });
+});
+
+// ===== GET EMPLOYEE LOANS =====
+router.get("/:id/loans", (req, res) => {
+  const { id } = req.params;
+  const sql = "SELECT * FROM employee_loans WHERE employee_id=? ORDER BY id DESC";
+  db.query(sql, [id], (err, rows) => {
+    if (err) return res.status(500).json({ error: "Failed to fetch loans" });
+    res.json(rows);
+  });
+});
+
+// ===== ADD EMPLOYEE LOAN =====
+router.post("/:id/loans", (req, res) => {
+  const { id } = req.params;
+  const { amount, reason, loan_date } = req.body;
+
+  if (!amount || isNaN(Number(amount))) return res.status(400).json({ error: "Valid amount is required" });
+
+  const numAmount = Number(amount);
+  const sql = "INSERT INTO employee_loans (employee_id, amount, reason, loan_date, total_paid, remaining) VALUES (?, ?, ?, ?, ?, ?)";
+  
+  db.query(sql, [id, numAmount, reason || "", loan_date, 0, numAmount], (err, result) => {
+    if (err) {
+      console.error("LOAN INSERT ERROR:", err);
+      return res.status(500).json({ error: "Failed to add loan", details: err.message });
+    }
+
+    db.query("SELECT * FROM employee_loans WHERE id=?", [result.insertId], (err2, rows) => {
+      if (err2) return res.status(500).json({ error: "Failed to fetch new loan" });
+      res.json(rows[0]);
+    });
+  });
+});
+
+// ===== DELETE EMPLOYEE LOAN =====
+router.delete("/:id/loans/:loanId", (req, res) => {
+  const { loanId } = req.params;
+  db.query("DELETE FROM employee_loans WHERE id=?", [loanId], (err) => {
+    if (err) return res.status(500).json({ error: "Failed to delete loan" });
+    res.json({ message: "Loan deleted successfully" });
+  });
+});
+
+// ===== PAY EMPLOYEE LOAN =====
+router.put("/:id/loans/:loanId/pay", (req, res) => {
+  const { loanId } = req.params;
+  const { paymentAmount } = req.body;
+
+  if (!paymentAmount || isNaN(Number(paymentAmount))) {
+    return res.status(400).json({ error: "Valid payment amount is required" });
+  }
+
+  const amount = Number(paymentAmount);
+
+  // First fetch the current loan to compute the new remaining balance
+  db.query("SELECT * FROM employee_loans WHERE id=?", [loanId], (err, rows) => {
+    if (err) return res.status(500).json({ error: "Failed to fetch loan" });
+    if (rows.length === 0) return res.status(404).json({ error: "Loan not found" });
+
+    const loan = rows[0];
+    const newTotalPaid = Number(loan.total_paid || 0) + amount;
+    const newRemaining = Number(loan.remaining || 0) - amount;
+
+    // Reject overpayment natively
+    if (newRemaining < 0) {
+      return res.status(400).json({ error: "Payment exceeds remaining balance" });
+    }
+
+    db.query(
+      "UPDATE employee_loans SET total_paid=?, remaining=? WHERE id=?",
+      [newTotalPaid, newRemaining, loanId],
+      (err2) => {
+        if (err2) return res.status(500).json({ error: "Failed to update loan" });
+
+        // Return updated loan
+        db.query("SELECT * FROM employee_loans WHERE id=?", [loanId], (err3, updatedRows) => {
+          if (err3) return res.status(500).json({ error: "Failed to fetch updated loan" });
+          res.json(updatedRows[0]);
+        });
+      }
+    );
   });
 });
 

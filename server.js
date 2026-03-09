@@ -37,14 +37,14 @@ app.use(cors({
 app.use(express.json());
 
 // ================= ROUTES =================
-app.use("/api/drinks", barRoutes);
+app.use("/api/bar", barRoutes);
 app.use("/api/kitchen", kitchenRoutes);
 app.use("/api/expenses", expensesRoutes);
 app.use("/api/credits", creditsRoutes); 
 app.use("/api/billiard", billiardRoutes);
 app.use("/api/guesthouse", guesthouseRoutes);
 app.use("/api/gym", gymRoutes);
-app.use("/api", totalsRoutes);
+app.use("/api/total-money", totalsRoutes);
 app.use("/api", authRoutes);
 app.use("/api", logRoutes);
 

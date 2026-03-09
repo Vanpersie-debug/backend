@@ -237,6 +237,17 @@ router.put("/edit/:id", (req, res) => {
 });
 
 // =====================================================
+// DELETE PRODUCT
+// =====================================================
+router.delete("/:id", (req, res) => {
+  const { id } = req.params;
+  db.query("DELETE FROM bar_products WHERE id = ?", [id], (err) => {
+    if (err) return res.status(500).json(err);
+    res.json({ message: "Product deleted successfully" });
+  });
+});
+
+// =====================================================
 // GET STATS - DAY, WEEK, MONTH, YEAR TOTALS
 // =====================================================
 router.get("/stats/timePeriods", (req, res) => {
