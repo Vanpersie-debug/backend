@@ -4,53 +4,79 @@ const router = express.Router();
 const db = require("../db"); // your database connection
 
 // GET /api/total-money
-router.get("/total-money", async (req, res) => {
+router.get("/total-money", (req, res) => {
+  const today = new Date().toISOString().split("T")[0]; // YYYY-MM-DD
+
   try {
-    // Drinks total
-    const drinksResult = await db.query(
-      "SELECT SUM(quantity * price) AS total FROM drinks_sales"
-    );
-    const drinks = drinksResult[0].total || 0;
+    // Bar/Drinks total - SUM of (sold * price)
+    db.query(
+      "SELECT SUM(sold * price) AS total FROM bar_products WHERE date = ?",
+      [today],
+      async (err1, drinksResult) => {
+        if (err1) return res.status(500).json(err1);
+        const drinks = drinksResult[0]?.total || 0;
 
-    // Kitchen total
-    const kitchenResult = await db.query(
-      "SELECT SUM(quantity * price) AS total FROM kitchen_sales"
-    );
-    const kitchen = kitchenResult[0].total || 0;
+        // Kitchen total - SUM of (sold * price)
+        db.query(
+          "SELECT SUM(sold * price) AS total FROM kitchen_products WHERE date = ?",
+          [today],
+          async (err2, kitchenResult) => {
+            if (err2) return res.status(500).json(err2);
+            const kitchen = kitchenResult[0]?.total || 0;
 
-    // Billiard total
-    const billiardResult = await db.query(
-      "SELECT SUM(amount_paid) AS total FROM billiard_sales"
-    );
-    const billiard = billiardResult[0].total || 0;
+            // Billiard total - SUM of (token + cash + cash_momo)
+            db.query(
+              "SELECT SUM(token + cash + cash_momo) AS total FROM billiard WHERE date = ?",
+              [today],
+              async (err3, billiardResult) => {
+                if (err3) return res.status(500).json(err3);
+                const billiard = billiardResult[0]?.total || 0;
 
-    // Gym total
-    const gymResult = await db.query(
-      "SELECT SUM(amount_paid) AS total FROM gym_payments"
-    );
-    const gym = gymResult[0].total || 0;
+                // Gym total - SUM of (cash + cash_momo)
+                db.query(
+                  "SELECT SUM(cash + cash_momo) AS total FROM gym WHERE date = ?",
+                  [today],
+                  async (err4, gymResult) => {
+                    if (err4) return res.status(500).json(err4);
+                    const gym = gymResult[0]?.total || 0;
 
-    // Guesthouse total
-    const guesthouseResult = await db.query(
-      "SELECT SUM(amount_paid) AS total FROM guesthouse_payments"
-    );
-    const guesthouse = guesthouseResult[0].total || 0;
+                    // Guesthouse total - SUM of (vip * vip_price + normal * normal_price)
+                    db.query(
+                      "SELECT SUM((vip * vip_price) + (normal * normal_price)) AS total FROM guesthouse WHERE date = ?",
+                      [today],
+                      async (err5, guesthouseResult) => {
+                        if (err5) return res.status(500).json(err5);
+                        const guesthouse = guesthouseResult[0]?.total || 0;
 
-    // Expenses total
-    const expensesResult = await db.query(
-      "SELECT SUM(amount) AS total FROM expenses"
-    );
-    const expenses = expensesResult[0].total || 0;
+                        // Expenses total - SUM of amount
+                        db.query(
+                          "SELECT SUM(amount) AS total FROM expenses WHERE date = ?",
+                          [today],
+                          (err6, expensesResult) => {
+                            if (err6) return res.status(500).json(err6);
+                            const expenses = expensesResult[0]?.total || 0;
 
-    // Send JSON response
-    res.json({
-      drinks,
-      kitchen,
-      billiard,
-      gym,
-      guesthouse,
-      expenses,
-    });
+                            // Send JSON response
+                            res.json({
+                              drinks: Number(drinks) || 0,
+                              kitchen: Number(kitchen) || 0,
+                              billiard: Number(billiard) || 0,
+                              gym: Number(gym) || 0,
+                              guesthouse: Number(guesthouse) || 0,
+                              expenses: Number(expenses) || 0,
+                            });
+                          }
+                        );
+                      }
+                    );
+                  }
+                );
+              }
+            );
+          }
+        );
+      }
+    );
   } catch (error) {
     console.error(error);
     res.status(500).json({ error: "Failed to fetch totals" });

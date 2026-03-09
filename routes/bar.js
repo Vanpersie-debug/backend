@@ -236,4 +236,72 @@ router.put("/edit/:id", (req, res) => {
   );
 });
 
+// =====================================================
+// GET STATS - DAY, WEEK, MONTH, YEAR TOTALS
+// =====================================================
+router.get("/stats/timePeriods", (req, res) => {
+  const today = new Date();
+  const todayStr = today.toISOString().split("T")[0];
+  
+  // Week: last 7 days
+  const weekStart = new Date(today);
+  weekStart.setDate(weekStart.getDate() - 6);
+  const weekStartStr = weekStart.toISOString().split("T")[0];
+  
+  // Month: current month
+  const monthStart = new Date(today.getFullYear(), today.getMonth(), 1);
+  const monthStartStr = monthStart.toISOString().split("T")[0];
+  
+  // Year: current year
+  const yearStart = new Date(today.getFullYear(), 0, 1);
+  const yearStartStr = yearStart.toISOString().split("T")[0];
+
+  // Day total
+  db.query(
+    "SELECT SUM(sold * price) AS total FROM bar_products WHERE date = ?",
+    [todayStr],
+    (err1, dayResult) => {
+      if (err1) return res.status(500).json(err1);
+      const dayTotal = dayResult[0]?.total || 0;
+
+      // Week total
+      db.query(
+        "SELECT SUM(sold * price) AS total FROM bar_products WHERE date >= ? AND date <= ?",
+        [weekStartStr, todayStr],
+        (err2, weekResult) => {
+          if (err2) return res.status(500).json(err2);
+          const weekTotal = weekResult[0]?.total || 0;
+
+          // Month total
+          db.query(
+            "SELECT SUM(sold * price) AS total FROM bar_products WHERE date >= ? AND date <= ?",
+            [monthStartStr, todayStr],
+            (err3, monthResult) => {
+              if (err3) return res.status(500).json(err3);
+              const monthTotal = monthResult[0]?.total || 0;
+
+              // Year total
+              db.query(
+                "SELECT SUM(sold * price) AS total FROM bar_products WHERE date >= ? AND date <= ?",
+                [yearStartStr, todayStr],
+                (err4, yearResult) => {
+                  if (err4) return res.status(500).json(err4);
+                  const yearTotal = yearResult[0]?.total || 0;
+
+                  res.json({
+                    day: Number(dayTotal) || 0,
+                    week: Number(weekTotal) || 0,
+                    month: Number(monthTotal) || 0,
+                    year: Number(yearTotal) || 0,
+                  });
+                }
+              );
+            }
+          );
+        }
+      );
+    }
+  );
+});
+
 module.exports = router;
