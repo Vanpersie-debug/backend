@@ -6,7 +6,7 @@ const allowRoles = require("../middleware/roleMiddleware");
 const logActivity = require("../utils/activityLogger");
 
 // ================= GET BY DATE =================
-router.get("/", (req, res) => {
+router.get("/", verifyToken, (req, res) => {
   const { date } = req.query;
 
   if (!date) {
@@ -26,7 +26,7 @@ router.get("/", (req, res) => {
 });
 
 // ================= INSERT =================
-router.post("/", (req, res) => {
+router.post("/", verifyToken, allowRoles("SUPER_ADMIN", "ADMIN"), (req, res) => {
   const { date, vip, normal, vip_price, normal_price } = req.body;
 
   if (!date) {
@@ -53,6 +53,15 @@ router.post("/", (req, res) => {
         console.error(err);
         return res.status(500).json(err);
       }
+
+      logActivity({
+        userId: req.user.userId,
+        username: req.user.username,
+        action: `Added new GUESTHOUSE record for: ${date}`,
+        page: "GUESTHOUSE",
+        branch_id: req.user.branch_id,
+        ip: req.ip
+      });
 
       res.json({
         message: "Guesthouse record added",
@@ -121,7 +130,7 @@ router.delete("/:id", verifyToken, allowRoles("SUPER_ADMIN", "ADMIN"), (req, res
 });
 
 // ================= GET STATS - DAY, WEEK, MONTH, YEAR TOTALS =================
-router.get("/stats/timePeriods", (req, res) => {
+router.get("/stats/timePeriods", verifyToken, (req, res) => {
   const today = new Date();
   const todayStr = today.toISOString().split("T")[0];
   

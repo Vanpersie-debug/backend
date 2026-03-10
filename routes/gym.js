@@ -3,7 +3,7 @@ const router = express.Router();
 const db = require("../db");
 
 // ================= GET ALL GYM RECORDS (FILTER BY DATE) =================
-router.get("/", (req, res) => {
+router.get("/", verifyToken, (req, res) => {
   const { date } = req.query;
   let sql = "SELECT * FROM gym";
   const params = [];
@@ -22,7 +22,7 @@ router.get("/", (req, res) => {
 });
 
 // ================= ADD GYM RECORD =================
-router.post("/", (req, res) => {
+router.post("/", verifyToken, allowRoles("SUPER_ADMIN", "ADMIN"), (req, res) => {
   let { date, daily_people, monthly_people, cash, cash_momo } = req.body;
 
   if (!date) return res.status(400).json({ message: "Date is required" });
@@ -39,7 +39,14 @@ router.post("/", (req, res) => {
     VALUES (?, ?, ?, ?, ?, ?)
   `;
   db.query(sql, [date, daily_people, monthly_people, total_people, cash, cash_momo], (err, result) => {
-    if (err) return res.status(500).json(err);
+    logActivity({
+      userId: req.user.userId,
+      username: req.user.username,
+      action: `Added new GYM record for: ${date}`,
+      page: "GYM",
+      branch_id: req.user.branch_id,
+      ip: req.ip
+    });
     res.json({ message: "Gym record added", id: result.insertId });
   });
 });
@@ -106,7 +113,7 @@ router.delete("/:id", verifyToken, allowRoles("SUPER_ADMIN", "ADMIN"), (req, res
 });
 
 // ================= GET STATS - DAY, WEEK, MONTH, YEAR TOTALS =================
-router.get("/stats/timePeriods", (req, res) => {
+router.get("/stats/timePeriods", verifyToken, (req, res) => {
   const today = new Date();
   const todayStr = today.toISOString().split("T")[0];
   

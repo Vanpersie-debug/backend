@@ -1,10 +1,7 @@
-// backend/routes/totals.js
-const express = require("express");
-const router = express.Router();
-const db = require("../db"); // your database connection
+const verifyToken = require("../middleware/AuthMiddlewares");
 
 // GET /api/total-money
-router.get("/", (req, res) => {
+router.get("/", verifyToken, (req, res) => {
   const today = new Date().toISOString().split("T")[0]; // YYYY-MM-DD
 
   try {

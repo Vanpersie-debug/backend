@@ -6,7 +6,7 @@ const allowRoles = require("../middleware/roleMiddleware");
 const logActivity = require("../utils/activityLogger");
 
 // ================= GET ALL EXPENSES =================
-router.get("/", (req, res) => {
+router.get("/", verifyToken, (req, res) => {
   const sql = "SELECT * FROM expenses ORDER BY date DESC, id DESC";
 
   db.query(sql, (err, rows) => {
@@ -35,7 +35,7 @@ router.get("/", (req, res) => {
 });
 
 // ================= ADD EXPENSE =================
-router.post("/", (req, res) => {
+router.post("/", verifyToken, allowRoles("SUPER_ADMIN", "ADMIN"), (req, res) => {
   const { expense_name, amount, cost, date, category, is_profit } = req.body;
 
   if (!expense_name || !date || !category || is_profit === undefined) {
@@ -67,6 +67,14 @@ router.post("/", (req, res) => {
         [result.insertId],
         (err2, rows) => {
           if (err2) return res.status(500).json(err2);
+          logActivity({
+            userId: req.user.userId,
+            username: req.user.username,
+            action: `Added new EXPENSE: ${expense_name}`,
+            page: "EXPENSES",
+            branch_id: req.user.branch_id,
+            ip: req.ip
+          });
           res.json(rows[0]);
         }
       );
@@ -140,7 +148,7 @@ router.delete("/:id", verifyToken, allowRoles("SUPER_ADMIN", "ADMIN"), (req, res
 });
 
 // ================= GET STATS - DAY, WEEK, MONTH, YEAR TOTALS =================
-router.get("/stats/timePeriods", (req, res) => {
+router.get("/stats/timePeriods", verifyToken, (req, res) => {
   const today = new Date();
   const todayStr = today.toISOString().split("T")[0];
   

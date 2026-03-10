@@ -6,7 +6,7 @@ const allowRoles = require("../middleware/roleMiddleware");
 const logActivity = require("../utils/activityLogger");
 
 // ===== GET ALL EMPLOYEES W/ LOANS =====
-router.get("/", (req, res) => {
+router.get("/", verifyToken, (req, res) => {
   const sql = `
     SELECT 
       c.id, 
@@ -27,7 +27,7 @@ router.get("/", (req, res) => {
 });
 
 // ===== ADD NEW EMPLOYEE =====
-router.post("/", (req, res) => {
+router.post("/", verifyToken, allowRoles("SUPER_ADMIN", "ADMIN"), (req, res) => {
   const { name, payment } = req.body;
 
   if (!name || !name.trim()) return res.status(400).json({ error: "Name is required" });
@@ -43,6 +43,16 @@ router.post("/", (req, res) => {
     // Return the newly inserted employee
     db.query("SELECT * FROM credits WHERE id=?", [result.insertId], (err2, rows) => {
       if (err2) return res.status(500).json({ error: "Failed to fetch new employee" });
+
+      logActivity({
+        userId: req.user.userId,
+        username: req.user.username,
+        action: `Added new EMPLOYEE: ${name}`,
+        page: "CREDITS",
+        branch_id: req.user.branch_id,
+        ip: req.ip
+      });
+
       res.json(rows[0]);
     });
   });
@@ -68,7 +78,7 @@ router.delete("/:id", verifyToken, allowRoles("SUPER_ADMIN", "ADMIN"), (req, res
 });
 
 // ===== GET EMPLOYEE LOANS =====
-router.get("/:id/loans", (req, res) => {
+router.get("/:id/loans", verifyToken, (req, res) => {
   const { id } = req.params;
   const sql = "SELECT * FROM employee_loans WHERE employee_id=? ORDER BY id DESC";
   db.query(sql, [id], (err, rows) => {
@@ -78,7 +88,7 @@ router.get("/:id/loans", (req, res) => {
 });
 
 // ===== ADD EMPLOYEE LOAN =====
-router.post("/:id/loans", (req, res) => {
+router.post("/:id/loans", verifyToken, allowRoles("SUPER_ADMIN", "ADMIN"), (req, res) => {
   const { id } = req.params;
   const { amount, reason, loan_date } = req.body;
 
@@ -95,6 +105,16 @@ router.post("/:id/loans", (req, res) => {
 
     db.query("SELECT * FROM employee_loans WHERE id=?", [result.insertId], (err2, rows) => {
       if (err2) return res.status(500).json({ error: "Failed to fetch new loan" });
+
+      logActivity({
+        userId: req.user.userId,
+        username: req.user.username,
+        action: `Added LOAN: ${amount} for Employee ID: ${id}`,
+        page: "CREDITS",
+        branch_id: req.user.branch_id,
+        ip: req.ip
+      });
+
       res.json(rows[0]);
     });
   });

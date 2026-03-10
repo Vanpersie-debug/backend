@@ -3,6 +3,7 @@ const router = express.Router();
 const db = require("../db");
 const verifyToken = require("../middleware/AuthMiddlewares");
 const allowRoles = require("../middleware/roleMiddleware");
+const logActivity = require("../utils/activityLogger");
 
 // ==================================================
 // GET ALL USERS (Admin Only)
@@ -34,6 +35,15 @@ router.post("/", verifyToken, allowRoles("SUPER_ADMIN", "ADMIN"), async (req, re
       "INSERT INTO users (username, password, role, branch_id, status) VALUES (?, ?, ?, ?, 'active')",
       [username, password, role, branch_id || null]
     );
+
+    logActivity({
+      userId: req.user.userId,
+      username: req.user.username,
+      action: `Created new user: ${username} (Role: ${role})`,
+      page: "USER_MANAGEMENT",
+      branch_id: req.user.branch_id,
+      ip: req.ip
+    });
 
     res.json({
       message: "User created successfully",
@@ -74,6 +84,16 @@ router.put("/:id", verifyToken, allowRoles("SUPER_ADMIN", "ADMIN"), async (req, 
     const sql = `UPDATE users SET ${updates.join(", ")} WHERE userId = ?`;
 
     await db.promise().query(sql, values);
+
+    logActivity({
+      userId: req.user.userId,
+      username: req.user.username,
+      action: `Updated user ID: ${id} (${updates.join(", ")})`,
+      page: "USER_MANAGEMENT",
+      branch_id: req.user.branch_id,
+      ip: req.ip
+    });
+
     res.json({ message: "User updated successfully" });
   } catch (error) {
     console.error("Update User Error:", error);
@@ -89,6 +109,16 @@ router.delete("/:id", verifyToken, allowRoles("SUPER_ADMIN", "ADMIN"), async (re
 
   try {
     await db.promise().query("DELETE FROM users WHERE userId = ?", [id]);
+
+    logActivity({
+      userId: req.user.userId,
+      username: req.user.username,
+      action: `Deleted user ID: ${id}`,
+      page: "USER_MANAGEMENT",
+      branch_id: req.user.branch_id,
+      ip: req.ip
+    });
+
     res.json({ message: "User deleted successfully" });
   } catch (error) {
     console.error("Delete User Error:", error);

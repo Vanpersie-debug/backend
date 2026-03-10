@@ -6,7 +6,7 @@ const allowRoles = require("../middleware/roleMiddleware");
 const logActivity = require("../utils/activityLogger");
 
 // ================= GET ALL RECORDS =================
-router.get("/", (req, res) => {
+router.get("/", verifyToken, (req, res) => {
   const { date } = req.query;
   let sql = "SELECT * FROM billiard";
   const params = [];
@@ -32,7 +32,7 @@ router.get("/", (req, res) => {
 });
 
 // ================= ADD RECORD =================
-router.post("/", (req, res) => {
+router.post("/", verifyToken, allowRoles("SUPER_ADMIN", "ADMIN"), (req, res) => {
   const { date, token, cash, cash_momo } = req.body;
 
   if (!date) return res.status(400).json({ message: "Date is required" });
@@ -50,6 +50,16 @@ router.post("/", (req, res) => {
 
         const row = rows[0];
         row.total = Number(row.token || 0) + Number(row.cash || 0) + Number(row.cash_momo || 0);
+
+        logActivity({
+          userId: req.user.userId,
+          username: req.user.username,
+          action: `Added new BILLIARD record for: ${date}`,
+          page: "BILLIARD",
+          branch_id: req.user.branch_id,
+          ip: req.ip
+        });
+
         res.json(row);
       });
     }
@@ -112,7 +122,7 @@ router.delete("/:id", verifyToken, allowRoles("SUPER_ADMIN", "ADMIN"), (req, res
 });
 
 // ================= GET STATS - DAY, WEEK, MONTH, YEAR TOTALS =================
-router.get("/stats/timePeriods", (req, res) => {
+router.get("/stats/timePeriods", verifyToken, (req, res) => {
   const today = new Date();
   const todayStr = today.toISOString().split("T")[0];
   
