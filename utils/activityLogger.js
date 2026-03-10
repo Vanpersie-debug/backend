@@ -9,7 +9,7 @@ const logActivity = async ({
   ip,
 }) => {
   try {
-    await db.query(
+    await db.promise().query(
       `INSERT INTO activity_logs
       (user_id,username,action,page,branch_id,ip_address)
       VALUES (?,?,?,?,?,?)`,

@@ -24,7 +24,7 @@ const verifyToken = async (req, res, next) => {
 
     const decoded = jwt.verify(token, "lacaselo_secret_key");
 
-    const [users] = await db.query(
+    const [users] = await db.promise().query(
       "SELECT userId, username, role, status, branch_id FROM users WHERE userId = ?",
       [decoded.id]
     );

@@ -12,6 +12,7 @@ const guesthouseRoutes = require("./routes/guesthouse");
 const gymRoutes = require("./routes/gym");
 const authRoutes = require("./routes/auth");
 const logRoutes = require("./routes/log");
+const usersRoutes = require("./routes/users");
 
 const app = express();
 
@@ -47,6 +48,7 @@ app.use("/api/gym", gymRoutes);
 app.use("/api/total-money", totalsRoutes);
 app.use("/api", authRoutes);
 app.use("/api", logRoutes);
+app.use("/api/users", usersRoutes);
 
 // ================= DEFAULT ROUTE =================
 app.get("/", (req, res) => {

@@ -5,6 +5,7 @@ const jwt = require("jsonwebtoken");
 
 router.post("/login", async (req, res) => {
   try {
+    console.time("login_total");
     const { username, password } = req.body;
 
     if (!username || !password) {
@@ -52,6 +53,7 @@ router.post("/login", async (req, res) => {
         branch: user.branch_id,
       },
     });
+    console.timeEnd("login_total");
   } catch (error) {
     console.error("❌ Login Error:", error.message);
     console.error("Stack:", error.stack);
