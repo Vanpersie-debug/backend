@@ -9,7 +9,7 @@ const logActivity = require("../utils/activityLogger");
 // ==================================================
 // GET ALL PRODUCTS BY DATE
 // ==================================================
-router.get("/", (req, res) => {
+router.get("/", verifyToken, (req, res) => {
   const { date } = req.query;
 
   if (!date) {
@@ -71,7 +71,7 @@ router.get("/", (req, res) => {
 // ==================================================
 // ADD NEW FOOD
 // ==================================================
-router.post("/", (req, res) => {
+router.post("/", verifyToken, allowRoles("SUPER_ADMIN", "ADMIN"), (req, res) => {
   const { name, initial_price, price, opening_stock, date } = req.body;
 
   if (!name || !date) {
@@ -101,10 +101,19 @@ router.post("/", (req, res) => {
         return res.status(500).json(err);
       }
 
-      res.json({
-        message: "Food added successfully",
-        id: result.insertId,
-      });
+        logActivity({
+          userId: req.user.userId,
+          username: req.user.username,
+          action: `Added new KITCHEN food: ${name}`,
+          page: "KITCHEN",
+          branch_id: req.user.branch_id,
+          ip: req.ip
+        });
+
+        res.json({
+          message: "Food added successfully",
+          id: result.insertId,
+        });
     }
   );
 });
@@ -251,7 +260,7 @@ router.delete("/:id", verifyToken, allowRoles("SUPER_ADMIN", "ADMIN"), (req, res
 // ==================================================
 // GET STATS - DAY, WEEK, MONTH, YEAR TOTALS
 // ==================================================
-router.get("/stats/timePeriods", (req, res) => {
+router.get("/stats/timePeriods", verifyToken, (req, res) => {
   const today = new Date();
   const todayStr = today.toISOString().split("T")[0];
   
