@@ -156,14 +156,9 @@ router.put("/sold/:id", (req, res) => {
     WHERE id = ? AND date = ?
   `;
 
-  db.query(sql, [Number(sold), id, date], (err) => {
-    if (err) {
-      console.error("Sold update error:", err);
-      return res.status(500).json(err);
-    }
-
+    res.json({ message: "Sold updated successfully" });
   });
-});
+
 
 // =====================================================
 // EDIT PRODUCT (NAME + COST + SELLING + OPENING STOCK)

@@ -147,7 +147,53 @@ router.post("/", (req, res) => {
 });
 
 // =====================================================
-// UPDATE STOCK (ENTREE + SOLD)
+// UPDATE ENTREE
+// =====================================================
+router.put("/entree/:id", (req, res) => {
+  const { entree, date } = req.body;
+  const { id } = req.params;
+
+  if (entree == null || !date) {
+    return res.status(400).json({ message: "Entree and date required" });
+  }
+
+  db.query(
+    `UPDATE bar_products
+     SET entree = ?
+     WHERE id = ? AND date = ?`,
+    [Number(entree), id, date],
+    (err) => {
+      if (err) return res.status(500).json(err);
+      res.json({ message: "Entree updated successfully" });
+    }
+  );
+});
+
+// =====================================================
+// UPDATE SOLD
+// =====================================================
+router.put("/sold/:id", (req, res) => {
+  const { sold, date } = req.body;
+  const { id } = req.params;
+
+  if (sold == null || !date) {
+    return res.status(400).json({ message: "Sold and date required" });
+  }
+
+  db.query(
+    `UPDATE bar_products
+     SET sold = ?
+     WHERE id = ? AND date = ?`,
+    [Number(sold), id, date],
+    (err) => {
+      if (err) return res.status(500).json(err);
+      res.json({ message: "Sold updated successfully" });
+    }
+  );
+});
+
+// =====================================================
+// UPDATE STOCK (ENTREE + SOLD) - OLD/UNUSED?
 // =====================================================
 router.put("/stock/:id", (req, res) => {
   const { entree, sold, date } = req.body;
