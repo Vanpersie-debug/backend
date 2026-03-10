@@ -1,6 +1,9 @@
 const express = require("express");
 const router = express.Router();
 const db = require("../db");
+const verifyToken = require("../middleware/AuthMiddlewares");
+const allowRoles = require("../middleware/roleMiddleware");
+const logActivity = require("../utils/activityLogger");
 
 // ================= GET ALL EXPENSES =================
 router.get("/", (req, res) => {
@@ -72,40 +75,66 @@ router.post("/", (req, res) => {
 });
 
 // ================= UPDATE EXPENSE =================
-router.put("/:id", (req, res) => {
+router.put("/:id", verifyToken, (req, res) => {
   const { expense_name, amount, cost, date, category, is_profit } = req.body;
   const { id } = req.params;
 
-  const sql = `
-    UPDATE expenses 
-    SET expense_name=?, amount=?, cost=?, date=?, category=?, is_profit=?
-    WHERE id=?
-  `;
+  // 1. Check if record is locked
+  db.query("SELECT is_locked FROM expenses WHERE id = ?", [id], (err, rows) => {
+    if (err) return res.status(500).json(err);
+    if (!rows || rows.length === 0) return res.status(404).json({ message: "Not found" });
 
-  db.query(
-    sql,
-    [
-      expense_name,
-      Number(amount || 0),
-      Number(cost || 0),
-      date,
-      category,
-      Number(is_profit),
-      id
-    ],
-    (err) => {
-      if (err) return res.status(500).json(err);
-      res.json({ message: "Expense updated successfully" });
+    const isLocked = rows[0].is_locked;
+    const isAdmin = req.user.role === 'ADMIN' || req.user.role === 'SUPER_ADMIN';
+
+    if (isLocked && !isAdmin) {
+      return res.status(403).json({ message: "Record is locked and cannot be edited by staff." });
     }
-  );
+
+    const newLockStatus = isAdmin ? isLocked : 1;
+
+    const sql = `
+      UPDATE expenses 
+      SET expense_name=?, amount=?, cost=?, date=?, category=?, is_profit=?, is_locked=?
+      WHERE id=?
+    `;
+
+    db.query(
+      sql,
+      [
+        expense_name,
+        Number(amount || 0),
+        Number(cost || 0),
+        date,
+        category,
+        Number(is_profit),
+        newLockStatus,
+        id
+      ],
+      (err2) => {
+        if (err2) return res.status(500).json(err2);
+        res.json({ message: "Expense updated successfully", is_locked: newLockStatus });
+      }
+    );
+  });
 });
 
 // ================= DELETE EXPENSE =================
-router.delete("/:id", (req, res) => {
+router.delete("/:id", verifyToken, allowRoles("SUPER_ADMIN", "ADMIN"), (req, res) => {
   const { id } = req.params;
 
   db.query("DELETE FROM expenses WHERE id=?", [id], (err) => {
     if (err) return res.status(500).json(err);
+    
+    logActivity({
+      userId: req.user.userId,
+      username: req.user.username,
+      action: `Deleted EXPENSE record ID: ${id}`,
+      page: "EXPENSES",
+      branch_id: req.user.branch_id,
+      ip: req.ip
+    });
+
     res.json({ message: "Expense deleted successfully" });
   });
 });
@@ -119,8 +148,10 @@ router.get("/stats/timePeriods", (req, res) => {
   weekStart.setDate(weekStart.getDate() - 6);
   const weekStartStr = weekStart.toISOString().split("T")[0];
   
-  const monthStart = new Date(today.getFullYear(), today.getMonth(), 1);
-  const monthStartStr = monthStart.toISOString().split("T")[0];
+  // FIXED: Monthly reset logic (exact 1st of current month)
+  const y = today.getFullYear();
+  const m = String(today.getMonth() + 1).padStart(2, '0');
+  const monthStartStr = `${y}-${m}-01`;
   
   const yearStart = new Date(today.getFullYear(), 0, 1);
   const yearStartStr = yearStart.toISOString().split("T")[0];

@@ -1,6 +1,9 @@
 const express = require("express");
 const router = express.Router();
 const db = require("../db");
+const verifyToken = require("../middleware/AuthMiddlewares");
+const allowRoles = require("../middleware/roleMiddleware");
+const logActivity = require("../utils/activityLogger");
 
 
 // ==================================================
@@ -110,7 +113,7 @@ router.post("/", (req, res) => {
 // ==================================================
 // UPDATE ENTREE
 // ==================================================
-router.put("/entree/:id", (req, res) => {
+router.put("/entree/:id", verifyToken, (req, res) => {
   const { entree, date } = req.body;
   const { id } = req.params;
 
@@ -120,19 +123,34 @@ router.put("/entree/:id", (req, res) => {
     });
   }
 
-  const sql = `
-    UPDATE kitchen_products
-    SET entree = ?
-    WHERE id = ? AND date = ?
-  `;
+  // 1. Check if record is locked
+  db.query("SELECT is_locked FROM kitchen_products WHERE id = ?", [id], (err, rows) => {
+    if (err) return res.status(500).json(err);
+    if (!rows || rows.length === 0) return res.status(404).json({ message: "Not found" });
 
-  db.query(sql, [Number(entree), id, date], (err) => {
-    if (err) {
-      console.error("Entree update error:", err);
-      return res.status(500).json(err);
+    const isLocked = rows[0].is_locked;
+    const isAdmin = req.user.role === 'ADMIN' || req.user.role === 'SUPER_ADMIN';
+
+    if (isLocked && !isAdmin) {
+      return res.status(403).json({ message: "Record is locked and cannot be edited by staff." });
     }
 
-    res.json({ message: "Entree updated successfully" });
+    const newLockStatus = isAdmin ? isLocked : 1;
+
+    const sql = `
+      UPDATE kitchen_products
+      SET entree = ?, is_locked = ?
+      WHERE id = ? AND date = ?
+    `;
+
+    db.query(sql, [Number(entree), newLockStatus, id, date], (err2) => {
+      if (err2) {
+        console.error("Entree update error:", err2);
+        return res.status(500).json(err2);
+      }
+
+      res.json({ message: "Entree updated successfully", is_locked: newLockStatus });
+    });
   });
 });
 
@@ -140,7 +158,7 @@ router.put("/entree/:id", (req, res) => {
 // ==================================================
 // UPDATE SOLD
 // ==================================================
-router.put("/sold/:id", (req, res) => {
+router.put("/sold/:id", verifyToken, (req, res) => {
   const { sold, date } = req.body;
   const { id } = req.params;
 
@@ -150,12 +168,27 @@ router.put("/sold/:id", (req, res) => {
     });
   }
 
-  db.query(sql, [Number(sold), id, date], (err) => {
-    if (err) {
-      console.error("Sold update error:", err);
-      return res.status(500).json(err);
+  // 1. Check if record is locked
+  db.query("SELECT is_locked FROM kitchen_products WHERE id = ?", [id], (err, rows) => {
+    if (err) return res.status(500).json(err);
+    if (!rows || rows.length === 0) return res.status(404).json({ message: "Not found" });
+
+    const isLocked = rows[0].is_locked;
+    const isAdmin = req.user.role === 'ADMIN' || req.user.role === 'SUPER_ADMIN';
+
+    if (isLocked && !isAdmin) {
+      return res.status(403).json({ message: "Record is locked and cannot be edited by staff." });
     }
-    res.json({ message: "Sold updated successfully" });
+
+    const newLockStatus = isAdmin ? isLocked : 1;
+
+    db.query("UPDATE kitchen_products SET sold = ?, is_locked = ? WHERE id = ? AND date = ?", [Number(sold), newLockStatus, id, date], (err2) => {
+      if (err2) {
+        console.error("Sold update error:", err2);
+        return res.status(500).json(err2);
+      }
+      res.json({ message: "Sold updated successfully", is_locked: newLockStatus });
+    });
   });
 });
 
@@ -163,7 +196,7 @@ router.put("/sold/:id", (req, res) => {
 // =====================================================
 // EDIT PRODUCT (NAME + COST + SELLING + OPENING STOCK)
 // =====================================================
-router.put("/edit/:id", (req, res) => {
+router.put("/edit/:id", verifyToken, allowRoles("SUPER_ADMIN", "ADMIN"), (req, res) => {
   const { name, initial_price, price, opening_stock, date } = req.body;
   const { id } = req.params;
 
@@ -197,10 +230,20 @@ router.put("/edit/:id", (req, res) => {
 // =====================================================
 // DELETE PRODUCT
 // =====================================================
-router.delete("/:id", (req, res) => {
+router.delete("/:id", verifyToken, allowRoles("SUPER_ADMIN", "ADMIN"), (req, res) => {
   const { id } = req.params;
   db.query("DELETE FROM kitchen_products WHERE id = ?", [id], (err) => {
     if (err) return res.status(500).json(err);
+    
+    logActivity({
+      userId: req.user.userId,
+      username: req.user.username,
+      action: `Deleted KITCHEN product ID: ${id}`,
+      page: "KITCHEN",
+      branch_id: req.user.branch_id,
+      ip: req.ip
+    });
+
     res.json({ message: "Product deleted successfully" });
   });
 });
@@ -216,8 +259,10 @@ router.get("/stats/timePeriods", (req, res) => {
   weekStart.setDate(weekStart.getDate() - 6);
   const weekStartStr = weekStart.toISOString().split("T")[0];
   
-  const monthStart = new Date(today.getFullYear(), today.getMonth(), 1);
-  const monthStartStr = monthStart.toISOString().split("T")[0];
+  // FIXED: Monthly reset logic (exact 1st of current month)
+  const y = today.getFullYear();
+  const m = String(today.getMonth() + 1).padStart(2, '0');
+  const monthStartStr = `${y}-${m}-01`;
   
   const yearStart = new Date(today.getFullYear(), 0, 1);
   const yearStartStr = yearStart.toISOString().split("T")[0];

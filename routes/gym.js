@@ -45,24 +45,39 @@ router.post("/", (req, res) => {
 });
 
 // ================= UPDATE GYM RECORD =================
-router.put("/:id", (req, res) => {
+router.put("/:id", verifyToken, (req, res) => {
   const { id } = req.params;
   let { daily_people, monthly_people, cash, cash_momo } = req.body;
 
-  daily_people = Number(daily_people || 0);
-  monthly_people = Number(monthly_people || 0);
-  cash = Number(cash || 0);
-  cash_momo = Number(cash_momo || 0);
-  const total_people = daily_people + monthly_people;
-
-  const sql = `
-    UPDATE gym
-    SET daily_people=?, monthly_people=?, total_people=?, cash=?, cash_momo=?
-    WHERE id=?
-  `;
-  db.query(sql, [daily_people, monthly_people, total_people, cash, cash_momo, id], (err) => {
+  // 1. Check if record is locked
+  db.query("SELECT is_locked FROM gym WHERE id = ?", [id], (err, rows) => {
     if (err) return res.status(500).json(err);
-    res.json({ message: "Gym record updated successfully" });
+    if (!rows || rows.length === 0) return res.status(404).json({ message: "Record not found" });
+
+    const isLocked = rows[0].is_locked;
+    const isAdmin = req.user.role === "SUPER_ADMIN" || req.user.role === "ADMIN";
+
+    if (isLocked && !isAdmin) {
+      return res.status(403).json({ message: "This record is locked and can only be edited by an Admin." });
+    }
+
+    daily_people = Number(daily_people || 0);
+    monthly_people = Number(monthly_people || 0);
+    cash = Number(cash || 0);
+    cash_momo = Number(cash_momo || 0);
+    const total_people = daily_people + monthly_people;
+
+    // 2. Perform update (and set is_locked = 1 if non-admin)
+    const newLockStatus = isAdmin ? isLocked : 1;
+    const sql = `
+      UPDATE gym
+      SET daily_people=?, monthly_people=?, total_people=?, cash=?, cash_momo=?, is_locked=?
+      WHERE id=?
+    `;
+    db.query(sql, [daily_people, monthly_people, total_people, cash, cash_momo, newLockStatus, id], (err2) => {
+      if (err2) return res.status(500).json(err2);
+      res.json({ message: "Gym record updated successfully", is_locked: newLockStatus });
+    });
   });
 });
 
@@ -99,8 +114,10 @@ router.get("/stats/timePeriods", (req, res) => {
   weekStart.setDate(weekStart.getDate() - 6);
   const weekStartStr = weekStart.toISOString().split("T")[0];
   
-  const monthStart = new Date(today.getFullYear(), today.getMonth(), 1);
-  const monthStartStr = monthStart.toISOString().split("T")[0];
+  // FIXED: Monthly reset logic (exact 1st of current month)
+  const y = today.getFullYear();
+  const m = String(today.getMonth() + 1).padStart(2, '0');
+  const monthStartStr = `${y}-${m}-01`;
   
   const yearStart = new Date(today.getFullYear(), 0, 1);
   const yearStartStr = yearStart.toISOString().split("T")[0];

@@ -1,6 +1,9 @@
 const express = require("express");
 const router = express.Router();
 const db = require("../db"); // your MySQL connection
+const verifyToken = require("../middleware/AuthMiddlewares");
+const allowRoles = require("../middleware/roleMiddleware");
+const logActivity = require("../utils/activityLogger");
 
 // ===== GET ALL EMPLOYEES W/ LOANS =====
 router.get("/", (req, res) => {
@@ -46,10 +49,20 @@ router.post("/", (req, res) => {
 });
 
 // ===== DELETE EXISTING EMPLOYEE =====
-router.delete("/:id", (req, res) => {
+router.delete("/:id", verifyToken, allowRoles("SUPER_ADMIN", "ADMIN"), (req, res) => {
   const { id } = req.params;
   db.query("DELETE FROM credits WHERE id=?", [id], (err) => {
     if (err) return res.status(500).json({ error: "Failed to delete employee" });
+    
+    logActivity({
+      userId: req.user.userId,
+      username: req.user.username,
+      action: `Deleted EMPLOYEE ID: ${id}`,
+      page: "CREDITS",
+      branch_id: req.user.branch_id,
+      ip: req.ip
+    });
+
     res.json({ message: "Employee deleted successfully" });
   });
 });
@@ -88,16 +101,26 @@ router.post("/:id/loans", (req, res) => {
 });
 
 // ===== DELETE EMPLOYEE LOAN =====
-router.delete("/:id/loans/:loanId", (req, res) => {
+router.delete("/:id/loans/:loanId", verifyToken, allowRoles("SUPER_ADMIN", "ADMIN"), (req, res) => {
   const { loanId } = req.params;
   db.query("DELETE FROM employee_loans WHERE id=?", [loanId], (err) => {
     if (err) return res.status(500).json({ error: "Failed to delete loan" });
+    
+    logActivity({
+      userId: req.user.userId,
+      username: req.user.username,
+      action: `Deleted LOAN ID: ${loanId}`,
+      page: "CREDITS",
+      branch_id: req.user.branch_id,
+      ip: req.ip
+    });
+
     res.json({ message: "Loan deleted successfully" });
   });
 });
 
 // ===== PAY EMPLOYEE LOAN =====
-router.put("/:id/loans/:loanId/pay", (req, res) => {
+router.put("/:id/loans/:loanId/pay", verifyToken, (req, res) => {
   const { loanId } = req.params;
   const { paymentAmount } = req.body;
 
@@ -107,27 +130,33 @@ router.put("/:id/loans/:loanId/pay", (req, res) => {
 
   const amount = Number(paymentAmount);
 
-  // First fetch the current loan to compute the new remaining balance
-  db.query("SELECT * FROM employee_loans WHERE id=?", [loanId], (err, rows) => {
+  // 1. Check if record is locked
+  db.query("SELECT is_locked, total_paid, remaining FROM employee_loans WHERE id=?", [loanId], (err, rows) => {
     if (err) return res.status(500).json({ error: "Failed to fetch loan" });
     if (rows.length === 0) return res.status(404).json({ error: "Loan not found" });
 
     const loan = rows[0];
+    const isAdmin = req.user.role === 'ADMIN' || req.user.role === 'SUPER_ADMIN';
+
+    if (loan.is_locked && !isAdmin) {
+      return res.status(403).json({ error: "This loan record is locked and cannot be edited by staff." });
+    }
+
     const newTotalPaid = Number(loan.total_paid || 0) + amount;
     const newRemaining = Number(loan.remaining || 0) - amount;
 
-    // Reject overpayment natively
     if (newRemaining < 0) {
       return res.status(400).json({ error: "Payment exceeds remaining balance" });
     }
 
+    const newLockStatus = isAdmin ? loan.is_locked : 1;
+
     db.query(
-      "UPDATE employee_loans SET total_paid=?, remaining=? WHERE id=?",
-      [newTotalPaid, newRemaining, loanId],
+      "UPDATE employee_loans SET total_paid=?, remaining=?, is_locked=? WHERE id=?",
+      [newTotalPaid, newRemaining, newLockStatus, loanId],
       (err2) => {
         if (err2) return res.status(500).json({ error: "Failed to update loan" });
 
-        // Return updated loan
         db.query("SELECT * FROM employee_loans WHERE id=?", [loanId], (err3, updatedRows) => {
           if (err3) return res.status(500).json({ error: "Failed to fetch updated loan" });
           res.json(updatedRows[0]);
